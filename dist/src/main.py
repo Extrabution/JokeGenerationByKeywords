@@ -22,14 +22,15 @@ def main():
         freeze_support()
         num_workers = int(cpu_count() * 0.75)
         start_server(num_workers=1, reload=False, host='0.0.0.0')
-    except:
+    except Exception as e:
+        print("Something bad happened!", e)
         for worker in workers:
             worker.cancel()
 
         asyncio.gather(*worker, return_exceptions=True)
         print("Workers stopped")
 
-def start_server(host='127.0.0.1', port=8001, num_workers=4, loop='asyncio', reload=False):
+def start_server(host='127.0.0.1', port=8002, num_workers=4, loop='asyncio', reload=False):
     uvicorn.run('main:app', host=host,
                 port=port,
                 workers=num_workers,

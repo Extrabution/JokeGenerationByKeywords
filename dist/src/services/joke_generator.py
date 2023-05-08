@@ -4,8 +4,6 @@ import asyncio
 
 async def generate_joke(name):
     print(f"Worker-{name} started")
-    task_id, text, swear_flag = await task_queue.get()
-
     import pickle
 
     with open("../../data/article_texts.txt", 'rb') as f:
@@ -24,11 +22,10 @@ async def generate_joke(name):
         translated_anecs_prepared = pickle.load(f)
     with open("../../data/english_anecs_prepared.pickle", "rb") as f:
         english_anecs_prepared = pickle.load(f)
-
+    print("Downloaded needed data")
     from transformers import BertTokenizerFast
-
     tokenizer = BertTokenizerFast.from_pretrained('dslim/bert-base-NER')
-
+    print("Downloaded tokenizer")
     def tokenize(data: str):
         inputs = tokenizer(data, return_tensors="pt", truncation=True, padding=True)
         return inputs
@@ -51,9 +48,11 @@ async def generate_joke(name):
             return output
 
     model = BertModel()
-
-    model.load_state_dict(torch.load('../models/bert_trainedNEREnglish', map_location=torch.device('cpu')))
-
+    try:
+        model.load_state_dict(torch.load('models/bert_trainedNEREnglish', map_location=torch.device('cpu')))
+    except Exception as e:
+        print("Alarm", e)
+    print("Downloaded pretrained model")
     import numpy as np
 
     def get_ners(text: str) -> list:
@@ -61,7 +60,6 @@ async def generate_joke(name):
         B = np.asarray([tokenizer(text.replace("-", ""))["input_ids"]]).reshape(1, 1, -1)
         logits = model(torch.as_tensor(np.array(B))[0])[0]
         for j in range(logits.shape[0]):
-            # print(logits[i])
             logits_clean = logits[j].argmax(dim=1)
             words = text.replace("-", "").split()
             tokenized_sentence = ids_to_tokens(tokenizer(text.replace("-", ""))["input_ids"])
@@ -86,21 +84,21 @@ async def generate_joke(name):
                     k += 1
                 i += 1
         return output
-
+    print("Downloading glove-wiki-gigaword-300 ...")
+    import time
+    start = time.time()
     import gensim.downloader
     glove_vectors = gensim.downloader.load('glove-wiki-gigaword-300')
-
+    print("Downloaded in", time.time()-start, "seconds")
     def get_embeddings(list_of_tags: list):
         emeddings = []
         for tag in list_of_tags:
             try:
-                # print(tokenizer.convert_ids_to_tokens(tokenizer(tag["word"])["input_ids"][1]))
                 embed = glove_vectors[tag["word"]]
                 emeddings.append({'entity': tag["entity"], 'word': tag["word"], "embedding": embed})
             except:
                 emeddings.append(
                     {'entity': tag["entity"], 'word': tag["word"], "embedding": glove_vectors["base"]})
-                # print("Broken embedding", tag["word"], tag["entity"])
         return emeddings
 
     def get_non_o(ner_words):
@@ -119,11 +117,9 @@ async def generate_joke(name):
         embedding_cosine_sum = 0
         for embedding in text_embeddings:
             cosines = []
-            pair = ""
             simmilarity_tags = {}
             for embed in anec_embeddings:
                 anec_unique_tags_counter[embed["entity"]] += 1
-                # print(f"{embed['word']}:{embed['entity']}", f"{embedding['word']}:{embedding['entity']}")
                 if embed["entity"] == embedding["entity"]:
                     v1 = embedding["embedding"]
                     v2 = embed["embedding"]
@@ -147,7 +143,7 @@ async def generate_joke(name):
         embedding_cosine_sum /= len(top_similarity.keys()) if len(top_similarity.keys()) > 5 else 5
         return embedding_cosine_sum, top_similarity
 
-    def get_resulted_text(text: str):
+    def get_resulted_text(text: str, swear_flag):
         best_anec = None
         best_cos = -10
         best_simmilarity = None
@@ -157,7 +153,7 @@ async def generate_joke(name):
             resulted_anec_list = english_anecs_prepared
         filtred_text = get_non_o(get_ners(text))
         text_embeddings = get_embeddings(filtred_text)
-        for anec_embed, anec in resulted_anec_list[:100]:
+        for anec_embed, anec in resulted_anec_list:
             try:
                 new_cosine, new_simmilarity = count_cos_embeddings(text_embeddings, anec_embed)
                 if new_cosine > best_cos:
@@ -177,14 +173,15 @@ async def generate_joke(name):
         resulted_text = " ".join(words)
         return resulted_text
 
-
     try:
         while True:
+            task_id, text, swear_flag = await task_queue.get()
+            done_queue.put_nowait((task_id, get_resulted_text(text, swear_flag)))
             task_queue.task_done()
-            done_queue.put_nowait((task_id, text))
     except Exception as e:
         print(e)
         print(f"Worker-{name} stopped")
+
 
 async def start_workers(N_of_workers:int = 1):
     tasks = []

@@ -76,7 +76,7 @@
             function sendMessage(event) {
                 var input = document.getElementById("messageText")
                 var check_box = document.getElementById("swear_flag")
-                ws.send([input.value,"|",check_box.checked])
+                ws.send([input.value, "|", check_box.checked])
                 event.preventDefault()
             }
         </script>
