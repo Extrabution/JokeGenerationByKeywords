@@ -67,7 +67,7 @@
         <div id="voice" class="voice"></div>
             <textarea id="responseText"></textarea>
         <script>
-            var ws = new WebSocket("ws://localhost:8001/ws");
+            var ws = new WebSocket("ws://localhost:8002/ws");
             ws.onmessage = function(event) {
                 document.getElementById('result').innerHTML = "Result:"
                 var response_text = event.data;

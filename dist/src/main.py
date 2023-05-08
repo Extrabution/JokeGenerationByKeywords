@@ -29,7 +29,7 @@ def main():
         asyncio.gather(*worker, return_exceptions=True)
         print("Workers stopped")
 
-def start_server(host='127.0.0.1', port=8002, num_workers=4, loop='asyncio', reload=False):
+def start_server(host='127.0.0.1', port=8001, num_workers=4, loop='asyncio', reload=False):
     uvicorn.run('main:app', host=host,
                 port=port,
                 workers=num_workers,
