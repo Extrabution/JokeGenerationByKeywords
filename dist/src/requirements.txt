@@ -4,3 +4,5 @@ torch
 numpy
 gensim
 tqdm
+transformers
+websockets
