@@ -4,6 +4,9 @@
 src/data_collecting/ru_core_news_lg-3.5.0-py3-none-any.whl
 dist/src/models/bert_trainedNEREnglish
 src/models/bert_trainedNEREnglish
+data/glove_vectors.pickle
+dist/src/output.txt
+
 =======
 
 .ipynb_checkpoints/Untitled1-checkpoint.ipynb

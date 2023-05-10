@@ -9,7 +9,7 @@ import asyncio
 
 app = FastAPI()
 register(app)
-workers = None
+workers:list
 
 @app.on_event('startup')
 async def initial_task():

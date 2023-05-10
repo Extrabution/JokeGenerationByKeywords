@@ -17,11 +17,13 @@ async def generate_joke(name):
     with open("../../data/unique_labels.pickle", "rb") as f:
         unique_labels = pickle.load(f, encoding="UTF-8")
     with open("../../data/translated_anecs.txt", "r") as f:
-        translated_anecs = f.read().replace("<unk> ", "").replace("♪ ", "").split("\n")
+            translated_anecs = f.read().replace("<unk> ", "").replace("♪ ", "").split("\n")
     with open("../../data/translated_anecs_prepared.pickle", "rb") as f:
         translated_anecs_prepared = pickle.load(f)
     with open("../../data/english_anecs_prepared.pickle", "rb") as f:
         english_anecs_prepared = pickle.load(f)
+    with open("../../data/glove_vectors.pickle", "rb") as f:
+        glove_vectors = pickle.load(f)
     print("Downloaded needed data")
     from transformers import BertTokenizerFast
     tokenizer = BertTokenizerFast.from_pretrained('dslim/bert-base-NER')
@@ -61,35 +63,22 @@ async def generate_joke(name):
         logits = model(torch.as_tensor(np.array(B))[0])[0]
         for j in range(logits.shape[0]):
             logits_clean = logits[j].argmax(dim=1)
-            words = text.replace("-", "").split()
             tokenized_sentence = ids_to_tokens(tokenizer(text.replace("-", ""))["input_ids"])
             # for i in range(len(logits_clean)):
             #    print(tokenized_sentence[i], ids_to_labels[logits_clean[i].item()])
             # print([ids_to_labels[x.item()] for x in logits_clean])
-            k = 0
-            i = 0
-            for el in logits_clean[1:-1]:
-                if i == len(words):
-                    break
-                elem = logits_clean[1:-1][k]
-                if i + 1 <= len(logits_clean[1:-1]) and tokenized_sentence[i][:2] == "##":
-                    if elem.item() == "O":
-                        label = logits_clean[1:-1][i]
+            i = 1
+            for elem in logits_clean[1:-1]:
+                if i > 1 and (tokenized_sentence[i][:2] == "##" or ids_to_labels[elem.item()][0] == "I"):
+                    if tokenized_sentence[i][:2] == "##":
+                        output[-1]["word"] += tokenized_sentence[i][2:]
                     else:
-                        label = elem.item()
-                    output.append({"word": words[i], "entity": ids_to_labels[label]})
-                    k += 2
+                        output[-1]["word"] += tokenized_sentence[i]
                 else:
-                    output.append({"word": words[i], "entity": ids_to_labels[elem.item()]})
-                    k += 1
+                    output.append({"word": tokenized_sentence[i], "entity": ids_to_labels[elem.item()]})
                 i += 1
         return output
-    print("Downloading glove-wiki-gigaword-300 ...")
-    import time
-    start = time.time()
-    import gensim.downloader
-    glove_vectors = gensim.downloader.load('glove-wiki-gigaword-300')
-    print("Downloaded in", time.time()-start, "seconds")
+    print("Downloaded glove-wiki-gigaword-300 ...")
     def get_embeddings(list_of_tags: list):
         emeddings = []
         for tag in list_of_tags:
@@ -144,7 +133,7 @@ async def generate_joke(name):
         return embedding_cosine_sum, top_similarity
 
     def get_resulted_text(text: str, swear_flag):
-        best_anec = None
+        best_anec = ""
         best_cos = -10
         best_simmilarity = None
         if swear_flag:
